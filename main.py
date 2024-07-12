@@ -3,15 +3,14 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException
-import time
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import Select
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from fastapi import FastAPI, Query, HTTPException
-import logging
+import time
 
 app = FastAPI()
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 def search_napista(driver: webdriver.Chrome, car_model: str, car_marca: str,
                    transmissao: Optional[str] = None, preco_a_partir: Optional[str] = None,
@@ -36,53 +35,91 @@ def search_napista(driver: webdriver.Chrome, car_model: str, car_marca: str,
             driver.get(url)
             time.sleep(3)
 
-            car_names = []
-            car_prices = []
+            # Certifique-se de que o elemento select está visível e interaja com ele
+            try:
+                select_element = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.TAG_NAME, 'select'))
+                )
 
-            while True:
+                # Verifique se o elemento está visível
+                if select_element.is_displayed():
+                    select = Select(select_element)
+                    select.select_by_visible_text('Sem limite')
+                else:
+                    driver.execute_script("arguments[0].style.display = 'block';", select_element)
+                    select = Select(select_element)
+                    select.select_by_visible_text('Sem limite')
+
+            except TimeoutException:
+                pass
+
+            time.sleep(10)
+
+            cars_info = []
+
+            # Captura todos os links dos carros
+            links_elements = WebDriverWait(driver, 5).until(
+                EC.presence_of_all_elements_located((By.XPATH, './/a[starts-with(@href, "/anuncios/") and not(contains(@href, "lead/simular"))]'))
+            )
+
+            hrefs = [link.get_attribute("href") for link in links_elements]
+
+            # Itera sobre os links para coletar informações de cada carro
+            for href in hrefs:
                 try:
-                    results_napista = driver.find_elements(By.XPATH, '//div[contains(@class, "iRYCmh")]')
-
-                    if results_napista:
-                        for napista_result in results_napista:
-                            try:
-                                napista_car_name = napista_result.find_element(By.XPATH,
-                                                                               './/h2[contains(@class, " hXsWso")]').text
-                                napista_car_price = napista_result.find_element(By.XPATH,
-                                                                                './/div[contains(@class, " klMQDM")]').text
-
-                                car_names.append(napista_car_name)
-                                car_prices.append(napista_car_price)
-
-                            except StaleElementReferenceException:
-                                logger.error("Encountered StaleElementReferenceException. Retrying...")
-                                break
-
-                            except Exception as e:
-                                logger.error(f"Error processing napista result: {e}")
-
-                        return [{"name": name, "price": price} for name, price in zip(car_names, car_prices)]
-
-                    else:
-                        logger.info("No results found. Retrying...")
-                        time.sleep(2)
-
-                except StaleElementReferenceException:
-                    logger.error("Encountered StaleElementReferenceException outside. Retrying...")
+                    driver.get(href)
                     time.sleep(2)
 
-                except Exception as e:
-                    logger.error(f"Error in search_napista: {e}")
-                    time.sleep(2)
+                    car_name = WebDriverWait(driver, 1).until(
+                        EC.presence_of_element_located(
+                            (By.XPATH, '/html/body/div[1]/div/div[2]/div/div[2]/div[1]/div/div[2]/h1'))
+                    ).text
 
-        except NoSuchElementException as e:
-            logger.error(f"Element not found: {e}")
-        except Exception as e:
-            logger.error(f"Error in search_napista attempt {attempt}: {e}")
+                    car_price = WebDriverWait(driver, 2).until(
+                        EC.presence_of_element_located((By.XPATH,
+                                                        '/html/body/div[1]/div/div[2]/div/div[2]/div[2]/div/div[1]/div/div[1]/div[1]/div'))
+                    ).text
+
+                    car_localidade = WebDriverWait(driver, 2).until(
+                        EC.presence_of_element_located((By.XPATH,
+                                                        '/html/body/div[1]/div/div[2]/div/div[2]/div[1]/div/div[2]/div/div[2]'))
+                    ).text
+
+                    car_km = WebDriverWait(driver, 2).until(
+                        EC.presence_of_element_located((By.XPATH,
+                                                        '//li[div[div[text()="Quilometragem"]]]/div[@variant="subheading" and @color="text-primary"]'))
+                    ).text
+
+                    car_cambio = WebDriverWait(driver, 2).until(
+                        EC.presence_of_element_located((By.XPATH,
+                                                        '//li[div[div[text()="Câmbio"]]]/div[@variant="subheading" and @color="text-primary"]'))
+                    ).text
+
+                    cars_info.append({"name": car_name, "price": car_price, "localidade": car_localidade, "link": href, "km": car_km, "cambio": car_cambio})
+
+                    lead_contact_link = WebDriverWait(driver, 1).until(
+                        EC.presence_of_element_located((By.XPATH, '/html/body/div[1]/div/div[2]/div/div[2]/div[2]/div/div[1]/a[2]'))
+                    )
+                    lead_contact_link.click()
+                    time.sleep(1)
+
+                    if "/lead/contato" in driver.current_url:
+                        time.sleep(1)
+
+                except NoSuchElementException:
+                    pass
+                except TimeoutException:
+                    pass
+                except Exception:
+                    pass
+
+            return cars_info
+
+        except Exception:
+            pass
 
         attempt += 1
-        logger.info(f"Retrying... Attempt {attempt}/{max_retries}")
-        time.sleep(5)  # Wait before retrying
+        time.sleep(5)
 
     return []
 
@@ -98,22 +135,23 @@ async def get_data(car_marca: str = Query(..., description="Marca do carro"),
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--log-level=3")  # Disable logging level to severe
+        chrome_options.add_argument("--disable-logging")  # Disable logging
 
-        while True:
-            driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
 
-            napista_results = search_napista(driver, car_model, car_marca, transmissao, preco_a_partir, preco_ate, km)
+        napista_results = search_napista(driver, car_model, car_marca, transmissao, preco_a_partir, preco_ate, km)
 
-            driver.quit()
+        if napista_results:
+            return {
+                "napista_results": napista_results
+            }
+        else:
+            time.sleep(5)
 
-            if napista_results:
-                return {
-                    "napista_results": napista_results
-                }
-            else:
-                logger.info("Retrying data retrieval as napista results are not present.")
-                time.sleep(5)
-
-    except Exception as e:
-        logger.error(f"Error in get_data: {e}")
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+    finally:
+        if driver:
+            driver.quit()
