@@ -14,7 +14,9 @@ app = FastAPI()
 
 def search_napista(driver: webdriver.Chrome, car_model: str, car_marca: str,
                    transmissao: Optional[str] = None, preco_a_partir: Optional[str] = None,
-                   preco_ate: Optional[str] = None, km: Optional[str] = None) -> List[dict]:
+                   preco_ate: Optional[str] = None, km: Optional[str] = None,
+                   name_value: Optional[str] = None, phone_value: Optional[str] = None,
+                   email_value: Optional[str] = None, message_value: Optional[str] = None) -> List[dict]:
     max_retries = 5
     attempt = 0
 
@@ -53,7 +55,7 @@ def search_napista(driver: webdriver.Chrome, car_model: str, car_marca: str,
             except TimeoutException:
                 pass
 
-            time.sleep(10)
+            time.sleep(3)
 
             cars_info = []
 
@@ -104,7 +106,33 @@ def search_napista(driver: webdriver.Chrome, car_model: str, car_marca: str,
                     time.sleep(1)
 
                     if "/lead/contato" in driver.current_url:
+                        # Inserir valores nos campos de input
+                        if name_value:
+                            driver.find_element(By.NAME, 'client.name').send_keys(name_value)
+                        if phone_value:
+                            driver.find_element(By.NAME, 'client.phone').send_keys(phone_value)
+                        if email_value:
+                            driver.find_element(By.NAME, 'client.email').send_keys(email_value)
+                        if message_value:
+                            driver.find_element(By.NAME, 'messageToSeller').send_keys(message_value)
+
+                        # Esperar um momento para que os valores sejam refletidos na interface
                         time.sleep(1)
+
+                        # Obter os valores dos campos de input e imprimir
+                        if name_value:
+                            name_value = driver.find_element(By.NAME, 'client.name').get_attribute("value")
+                            print(f'Client Name: {name_value}')
+                        if phone_value:
+                            phone_value = driver.find_element(By.NAME, 'client.phone').get_attribute("value")
+                            print(f'Client Phone: {phone_value}')
+                        if email_value:
+                            email_value = driver.find_element(By.NAME, 'client.email').get_attribute("value")
+                            print(f'Client Email: {email_value}')
+                        if message_value:
+                            message_value = driver.find_element(By.NAME, 'messageToSeller').get_attribute("value")
+                            print(f'Message to Seller: {message_value}')
+
 
                 except NoSuchElementException:
                     pass
@@ -129,18 +157,23 @@ async def get_data(car_marca: str = Query(..., description="Marca do carro"),
                    transmissao: Optional[str] = Query(None, description="Tipo de transmissão"),
                    preco_a_partir: Optional[str] = Query(None, description="Preço a partir de"),
                    preco_ate: Optional[str] = Query(None, description="Preço até"),
-                   km: Optional[str] = Query(None, description="Limite de quilometragem")):
+                   km: Optional[str] = Query(None, description="Limite de quilometragem"),
+                   name_value: Optional[str] = Query(None, description="Client Name"),
+                   phone_value: Optional[str] = Query(None, description="Client Phone"),
+                   email_value: Optional[str] = Query(None, description="Client Email"),
+                   message_value: Optional[str] = Query(None, description="Message to Seller")):
     try:
         chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--headless")
         chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--log-level=3")  # Disable logging level to severe
-        chrome_options.add_argument("--disable-logging")  # Disable logging
+        chrome_options.add_argument("--log-level=3")
+        chrome_options.add_argument("--disable-logging")
 
         driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
 
-        napista_results = search_napista(driver, car_model, car_marca, transmissao, preco_a_partir, preco_ate, km)
+        napista_results = search_napista(driver, car_model, car_marca, transmissao, preco_a_partir, preco_ate, km,
+                                         name_value, phone_value, email_value, message_value)
 
         if napista_results:
             return {
