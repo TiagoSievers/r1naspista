@@ -35,11 +35,11 @@ def search_napista(driver: webdriver.Chrome, car_model: str, car_marca: str,
 
             url = 'https://napista.com.br/busca/' + '-'.join(url_parts)
             driver.get(url)
-            time.sleep(3)
+            time.sleep(1.5)  # Reduzido de 3 para 1.5
 
             # Certifique-se de que o elemento select está visível e interaja com ele
             try:
-                select_element = WebDriverWait(driver, 10).until(
+                select_element = WebDriverWait(driver, 5).until(  # Reduzido de 10 para 5
                     EC.presence_of_element_located((By.TAG_NAME, 'select'))
                 )
 
@@ -55,84 +55,124 @@ def search_napista(driver: webdriver.Chrome, car_model: str, car_marca: str,
             except TimeoutException:
                 pass
 
-            time.sleep(3)
+            time.sleep(5)  # Reduzido de 3 para 1.5
 
             cars_info = []
 
             # Captura todos os links dos carros
-            links_elements = WebDriverWait(driver, 5).until(
+            links_elements = WebDriverWait(driver, 3).until(  # Reduzido de 5 para 3
                 EC.presence_of_all_elements_located((By.XPATH, './/a[starts-with(@href, "/anuncios/") and not(contains(@href, "lead/simular"))]'))
             )
-
+            time.sleep(3)
             hrefs = [link.get_attribute("href") for link in links_elements]
 
             # Itera sobre os links para coletar informações de cada carro
             for href in hrefs:
                 try:
                     driver.get(href)
-                    time.sleep(2)
+                    time.sleep(1)  # Reduzido de 2 para 1
 
-                    car_name = WebDriverWait(driver, 1).until(
+                    car_name = WebDriverWait(driver, 1).until(  # Reduzido de 1 para 0.5
                         EC.presence_of_element_located(
                             (By.XPATH, '/html/body/div[1]/div/div[2]/div/div[2]/div[1]/div/div[2]/h1'))
                     ).text
 
-                    car_price = WebDriverWait(driver, 2).until(
+                    car_price = WebDriverWait(driver, 1).until(
                         EC.presence_of_element_located((By.XPATH,
                                                         '/html/body/div[1]/div/div[2]/div/div[2]/div[2]/div/div[1]/div/div[1]/div[1]/div'))
                     ).text
 
-                    car_localidade = WebDriverWait(driver, 2).until(
+                    car_localidade = WebDriverWait(driver, 1).until(
                         EC.presence_of_element_located((By.XPATH,
                                                         '/html/body/div[1]/div/div[2]/div/div[2]/div[1]/div/div[2]/div/div[2]'))
                     ).text
 
-                    car_km = WebDriverWait(driver, 2).until(
+                    car_km = WebDriverWait(driver, 1).until(
                         EC.presence_of_element_located((By.XPATH,
                                                         '//li[div[div[text()="Quilometragem"]]]/div[@variant="subheading" and @color="text-primary"]'))
                     ).text
 
-                    car_cambio = WebDriverWait(driver, 2).until(
+                    car_cambio = WebDriverWait(driver, 1).until(
                         EC.presence_of_element_located((By.XPATH,
                                                         '//li[div[div[text()="Câmbio"]]]/div[@variant="subheading" and @color="text-primary"]'))
                     ).text
 
-                    cars_info.append({"name": car_name, "price": car_price, "localidade": car_localidade, "link": href, "km": car_km, "cambio": car_cambio})
+                    car_ano = WebDriverWait(driver, 1).until(
+                        EC.presence_of_element_located((By.XPATH,
+                                                        '//li[div[div[text()="Ano"]]]/div[@variant="subheading" and @color="text-primary"]'))
+                    ).text
 
-                    lead_contact_link = WebDriverWait(driver, 1).until(
+                    car_loja = WebDriverWait(driver, 1).until(
+                        EC.presence_of_element_located((By.XPATH,
+                                                        '/html/body/div[1]/div/div[2]/div/div[2]/div[1]/div/div[11]/div[1]/h3'))
+                    ).text
+
+                    cars_info.append({"name": car_name, "price": car_price, "localidade": car_localidade, "link": href, "km": car_km, "cambio": car_cambio, "ano": car_ano, "loja": car_loja})
+
+                    lead_contact_link = WebDriverWait(driver, 0.5).until(  # Reduzido de 1 para 0.5
                         EC.presence_of_element_located((By.XPATH, '/html/body/div[1]/div/div[2]/div/div[2]/div[2]/div/div[1]/a[2]'))
                     )
                     lead_contact_link.click()
-                    time.sleep(1)
+                    time.sleep(0.5)  # Reduzido de 1 para 0.5
 
                     if "/lead/contato" in driver.current_url:
-                        # Inserir valores nos campos de input
-                        if name_value:
-                            driver.find_element(By.NAME, 'client.name').send_keys(name_value)
-                        if phone_value:
-                            driver.find_element(By.NAME, 'client.phone').send_keys(phone_value)
-                        if email_value:
-                            driver.find_element(By.NAME, 'client.email').send_keys(email_value)
-                        if message_value:
-                            driver.find_element(By.NAME, 'messageToSeller').send_keys(message_value)
 
-                        # Esperar um momento para que os valores sejam refletidos na interface
-                        time.sleep(1)
+                        try:
+                            # Verifique se o elemento "Não sou eu" está presente e visível
+                            try:
+                                nao_sou_eu_element = WebDriverWait(driver, 2.5).until(  # Reduzido de 5 para 2.5
+                                    EC.presence_of_element_located((By.XPATH,
+                                                                    '/html/body/div[1]/div/div[2]/div/div[2]/div/div/div/form/div/div[1]/div/div[2]/a/div'))
+                                )
+                                if nao_sou_eu_element.is_displayed():
+                                    nao_sou_eu_element.click()
+                                    print("Clicked on 'Não sou eu' link")
+                                    time.sleep(1)  # Reduzido de 2 para 1
+                            except TimeoutException:
+                                print("Elemento 'Não sou eu' não encontrado, preenchendo o formulário diretamente")
 
-                        # Obter os valores dos campos de input e imprimir
-                        if name_value:
-                            name_value = driver.find_element(By.NAME, 'client.name').get_attribute("value")
-                            print(f'Client Name: {name_value}')
-                        if phone_value:
-                            phone_value = driver.find_element(By.NAME, 'client.phone').get_attribute("value")
-                            print(f'Client Phone: {phone_value}')
-                        if email_value:
-                            email_value = driver.find_element(By.NAME, 'client.email').get_attribute("value")
-                            print(f'Client Email: {email_value}')
-                        if message_value:
-                            message_value = driver.find_element(By.NAME, 'messageToSeller').get_attribute("value")
-                            print(f'Message to Seller: {message_value}')
+                            # Inserir valores nos campos de input
+                            if name_value:
+                                driver.find_element(By.NAME, 'client.name').send_keys(name_value)
+                            if phone_value:
+                                driver.find_element(By.NAME, 'client.phone').send_keys(phone_value)
+                            if email_value:
+                                driver.find_element(By.NAME, 'client.email').send_keys(email_value)
+                            if message_value:
+                                driver.find_element(By.NAME, 'messageToSeller').send_keys(message_value)
 
+                            # Esperar um momento para que os valores sejam refletidos na interface
+                            time.sleep(0.5)  # Reduzido de 1 para 0.5
+
+                            # Obter os valores dos campos de input e imprimir
+                            if name_value:
+                                name_value = driver.find_element(By.NAME, 'client.name').get_attribute("value")
+                                print(f'Client Name: {name_value}')
+                            if phone_value:
+                                phone_value = driver.find_element(By.NAME, 'client.phone').get_attribute("value")
+                                print(f'Client Phone: {phone_value}')
+                            if email_value:
+                                email_value = driver.find_element(By.NAME, 'client.email').get_attribute("value")
+                                print(f'Client Email: {email_value}')
+                            if message_value:
+                                message_value = driver.find_element(By.NAME, 'messageToSeller').get_attribute("value")
+                                print(f'Message to Seller: {message_value}')
+
+                            # Role para o botão de envio
+                            submit_button = WebDriverWait(driver, 2.5).until(  # Reduzido de 5 para 2.5
+                                EC.element_to_be_clickable((By.XPATH,
+                                                            '/html/body/div[1]/div/div[2]/div/div[2]/div/div/div/form/div/div[4]/button'))
+                            )
+
+                            # Usando JavaScript para clicar no botão
+                            driver.execute_script("arguments[0].scrollIntoView(true);", submit_button)
+                            driver.execute_script("arguments[0].click();", submit_button)
+                            print("Clicked on submit button")  # Para debug
+
+                        except TimeoutException:
+                            print("TimeoutException: Could not find submit button or inputs")
+                        except Exception as e:
+                            print(f"Exception: {e}")
 
                 except NoSuchElementException:
                     pass
@@ -147,7 +187,7 @@ def search_napista(driver: webdriver.Chrome, car_model: str, car_marca: str,
             pass
 
         attempt += 1
-        time.sleep(5)
+        time.sleep(2.5)  # Reduzido de 5 para 2.5
 
     return []
 
@@ -180,7 +220,7 @@ async def get_data(car_marca: str = Query(..., description="Marca do carro"),
                 "napista_results": napista_results
             }
         else:
-            time.sleep(5)
+            time.sleep(2.5)  # Reduzido de 5 para 2.5
 
     except Exception:
         raise HTTPException(status_code=500, detail="Internal Server Error")
