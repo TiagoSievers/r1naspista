@@ -60,6 +60,10 @@ def search_napista(driver: webdriver.Chrome, car_model: str, car_marca: str,
 
                 time.sleep(5)  # Reduzido de 3 para 1.5
 
+                WebDriverWait(driver, 5).until(
+                    lambda driver: len(driver.find_elements(By.XPATH, './/ul[@class="sc-53e96303-0 cBddYs"]/li')) > 0
+                )
+
                 # Captura todos os links dos carros
                 links_elements = WebDriverWait(driver, 3).until(  # Reduzido de 5 para 3
                     EC.presence_of_all_elements_located((By.XPATH, './/a[starts-with(@href, "/anuncios/") and not(contains(@href, "lead/simular"))]'))
@@ -69,6 +73,7 @@ def search_napista(driver: webdriver.Chrome, car_model: str, car_marca: str,
                 print(f"Total de hrefs encontrados na página {page_number}: {len(hrefs)}")
 
                 # Itera sobre os links para coletar informações de cada carro
+
                 for href in hrefs:
                     try:
                         driver.get(href)
@@ -121,17 +126,17 @@ def search_napista(driver: webdriver.Chrome, car_model: str, car_marca: str,
 
                             try:
                                 # Verifique se o elemento "Não sou eu" está presente e visível
-                                """try:
+                                try:
                                     nao_sou_eu_element = WebDriverWait(driver, 2.5).until(  # Reduzido de 5 para 2.5
                                         EC.presence_of_element_located((By.XPATH,
                                                                         '/html/body/div[1]/div/div[2]/div/div[2]/div/div/div/form/div/div[1]/div/div[2]/a/div'))
                                     )
                                     if nao_sou_eu_element.is_displayed():
                                         nao_sou_eu_element.click()
-                                        print("Clicked on 'Não sou eu' link")
+                                        #print("Clicked on 'Não sou eu' link")
                                         time.sleep(1)  # Reduzido de 2 para 1
                                 except TimeoutException:
-                                    print("Elemento 'Não sou eu' não encontrado, preenchendo o formulário diretamente")
+                                    pass
 
                                 # Inserir valores nos campos de input
                                 if name_value:
@@ -149,16 +154,16 @@ def search_napista(driver: webdriver.Chrome, car_model: str, car_marca: str,
                                 # Obter os valores dos campos de input e imprimir
                                 if name_value:
                                     name_value = driver.find_element(By.NAME, 'client.name').get_attribute("value")
-                                    print(f'Client Name: {name_value}')
+                                    #print(f'Client Name: {name_value}')
                                 if phone_value:
                                     phone_value = driver.find_element(By.NAME, 'client.phone').get_attribute("value")
-                                    print(f'Client Phone: {phone_value}')
+                                    #print(f'Client Phone: {phone_value}')
                                 if email_value:
                                     email_value = driver.find_element(By.NAME, 'client.email').get_attribute("value")
-                                    print(f'Client Email: {email_value}')
+                                    #print(f'Client Email: {email_value}')
                                 if message_value:
                                     message_value = driver.find_element(By.NAME, 'messageToSeller').get_attribute("value")
-                                    print(f'Message to Seller: {message_value}')"""
+                                    #print(f'Message to Seller: {message_value}')
 
                                 # Role para o botão de envio
                                 submit_button = WebDriverWait(driver, 2.5).until(  # Reduzido de 5 para 2.5
