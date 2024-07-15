@@ -10,12 +10,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
 import time
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
-import concurrent.futures
-import time
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException, WebDriverException
 
-MAX_RETRIES = 5
+MAX_RETRIES = 3
 
 app = FastAPI()
 
@@ -30,7 +27,7 @@ def create_driver() -> webdriver.Chrome:
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--headless=new")
-    chrome_options.add_argument('window-size=1920x1080')
+    #chrome_options.add_argument('window-size=1920x1080')
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--log-level=3")
     chrome_options.add_argument("--disable-logging")
@@ -214,14 +211,16 @@ def capture_car_info(driver: webdriver.Chrome, href: str, name_value: str, phone
 
 def process_car_links(hrefs: List[str], name_value: str, phone_value: Optional[str], email_value: Optional[str], message_value: str) -> List[dict]:
     car_details_list = []
+    driver = create_driver()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        futures = [
-            executor.submit(capture_car_info, create_driver(), href, name_value, phone_value, email_value, message_value)
-            for href in hrefs
-        ]
-        for future in concurrent.futures.as_completed(futures):
-            car_details_list.append(future.result())
+    try:
+        for href in hrefs:
+            car_details_list.append(capture_car_info_with_retry(driver, href, name_value, phone_value, email_value, message_value))
+    except Exception as e:
+        print(f"An error occurred during car data processing: {str(e)}")
+        raise
+    finally:
+        driver.quit()
 
     return car_details_list
 
@@ -243,9 +242,7 @@ async def search_and_process(car_marca: str, car_model: str, transmissao: Option
 @app.post("/capture_car_data")
 async def capture_car_data(info: ContactInfo = Body(...)) -> List[Dict]:
     try:
-        driver = create_driver()
         car_details_list = process_car_links(info.hrefs, info.name_value, info.phone_value, info.email_value, info.message_value)
-        driver.quit()
         return car_details_list
 
     except Exception as e:
