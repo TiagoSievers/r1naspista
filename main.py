@@ -33,9 +33,6 @@ def create_driver() -> webdriver.Chrome:
     service = ChromeService(ChromeDriverManager().install())
     return webdriver.Chrome(service=service, options=chrome_options)
 
-def split_list(hrefs: List[str], n: int) -> Dict[str, List[str]]:
-    return {f"bloco {i//n + 1}": hrefs[i:i + n] for i in range(0, len(hrefs), n)}
-
 def search_hrefs(car_marca: str, car_model: str, transmissao: Optional[str] = None, preco_a_partir: Optional[str] = None,
                  preco_ate: Optional[str] = None, km: Optional[str] = None) -> List[str]:
     driver = create_driver()
@@ -225,15 +222,13 @@ def process_car_links(hrefs: List[str], name_value: str, phone_value: Optional[s
 
 @app.get("/search_hrefs")
 async def search_and_process(car_marca: str, car_model: str, transmissao: Optional[str] = None, preco_a_partir: Optional[str] = None,
-                             preco_ate: Optional[str] = None, km: Optional[str] = None) -> Dict[str, List[str]]:
+                             preco_ate: Optional[str] = None, km: Optional[str] = None) -> List[str]:
     try:
         hrefs = search_hrefs(car_marca, car_model, transmissao, preco_a_partir, preco_ate, km)
         if not hrefs:
             raise HTTPException(status_code=404, detail="No car listings found")
 
-        # Dividir a lista de URLs em blocos de 10
-        href_blocks = split_list(hrefs, 10)
-        return href_blocks
+        return hrefs
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
