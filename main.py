@@ -15,7 +15,7 @@ import concurrent.futures
 import time
 from selenium.common.exceptions import WebDriverException
 
-MAX_RETRIES = 3
+MAX_RETRIES = 5
 
 app = FastAPI()
 
@@ -30,7 +30,7 @@ def create_driver() -> webdriver.Chrome:
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--headless=new")
-    #chrome_options.add_argument('window-size=1920x1080')
+    chrome_options.add_argument('window-size=1920x1080')
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--log-level=3")
     chrome_options.add_argument("--disable-logging")
@@ -215,7 +215,7 @@ def capture_car_info(driver: webdriver.Chrome, href: str, name_value: str, phone
 def process_car_links(hrefs: List[str], name_value: str, phone_value: Optional[str], email_value: Optional[str], message_value: str) -> List[dict]:
     car_details_list = []
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         futures = [
             executor.submit(capture_car_info, create_driver(), href, name_value, phone_value, email_value, message_value)
             for href in hrefs
