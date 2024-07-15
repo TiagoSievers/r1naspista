@@ -1,5 +1,6 @@
 from typing import Optional, List, Dict
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Body
+from pydantic import BaseModel
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.chrome.options import Options
@@ -13,6 +14,13 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException,
 import concurrent.futures
 
 app = FastAPI()
+
+class HrefList(BaseModel):
+    hrefs: List[str]
+    name_value: str
+    phone_value: Optional[str]
+    email_value: Optional[str]
+    message_value: str
 
 def create_driver() -> webdriver.Chrome:
     chrome_options = webdriver.ChromeOptions()
@@ -221,13 +229,9 @@ async def search_and_process(car_model: str = Query(..., description="Modelo do 
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 @app.post("/capture_car_data")
-async def capture_car_data(hrefs: List[str] = Query(..., description="Lista de URLs dos carros"),
-                           name_value: str = Query(None, description="Nome do contato"),
-                           phone_value: Optional[str] = Query(None, description="Telefone do contato"),
-                           email_value: Optional[str] = Query(None, description="Email do contato"),
-                           message_value: str = Query(None, description="Mensagem para o vendedor")) -> List[Dict]:
+async def capture_car_data(data: HrefList) -> List[Dict]:
     try:
-        car_details_list = process_car_links(hrefs, name_value, phone_value, email_value, message_value)
+        car_details_list = process_car_links(data.hrefs, data.name_value, data.phone_value, data.email_value, data.message_value)
         return car_details_list
 
     except Exception as e:
