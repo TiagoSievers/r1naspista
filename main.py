@@ -10,22 +10,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
 import time
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
-import concurrent.futures
-import time
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException, WebDriverException
 
 MAX_RETRIES = 3
 
 app = FastAPI()
-
-# Define the data model for URLs with blocks
-class CarList(BaseModel):
-    car_list: Dict[str, List[str]]
-
-# Function to split the list of URLs into blocks of size n
-def split_list(hrefs: List[str], n: int) -> Dict[str, List[str]]:
-    return {f"bloco {i//n + 1}": hrefs[i:i + n] for i in range(0, len(hrefs), n)}
 
 class ContactInfo(BaseModel):
     hrefs: List[str]
@@ -43,6 +32,9 @@ def create_driver() -> webdriver.Chrome:
     chrome_options.add_argument("--disable-logging")
     service = ChromeService(ChromeDriverManager().install())
     return webdriver.Chrome(service=service, options=chrome_options)
+
+def split_list(lst, n):
+    return [lst[i:i + n] for i in range(0, len(lst), n)]
 
 def search_hrefs(car_marca: str, car_model: str, transmissao: Optional[str] = None, preco_a_partir: Optional[str] = None,
                  preco_ate: Optional[str] = None, km: Optional[str] = None) -> List[str]:
@@ -218,23 +210,22 @@ def capture_car_info(driver: webdriver.Chrome, href: str, name_value: str, phone
 
 def process_car_links(hrefs: List[str], name_value: str, phone_value: Optional[str], email_value: Optional[str], message_value: str) -> List[dict]:
     car_details_list = []
+    driver = create_driver()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [
-            executor.submit(capture_car_info, create_driver(), href, name_value, phone_value, email_value, message_value)
-            for href in hrefs
-        ]
-        for future in concurrent.futures.as_completed(futures):
-            car_details_list.append(future.result())
+    try:
+        for href in hrefs:
+            car_details_list.append(capture_car_info_with_retry(driver, href, name_value, phone_value, email_value, message_value))
+    except Exception as e:
+        print(f"An error occurred during car data processing: {str(e)}")
+        raise
+    finally:
+        driver.quit()
 
     return car_details_list
 
-
-# Endpoint para buscar e processar URLs de carros
-@app.get("/search_hrefs", response_model=CarList)
-async def search_and_process(car_marca: str, car_model: str, transmissao: Optional[str] = None,
-                             preco_a_partir: Optional[str] = None,
-                             preco_ate: Optional[str] = None, km: Optional[str] = None) -> CarList:
+@app.get("/search_hrefs")
+async def search_and_process(car_marca: str, car_model: str, transmissao: Optional[str] = None, preco_a_partir: Optional[str] = None,
+                             preco_ate: Optional[str] = None, km: Optional[str] = None) -> List[List[str]]:
     try:
         hrefs = search_hrefs(car_marca, car_model, transmissao, preco_a_partir, preco_ate, km)
         if not hrefs:
@@ -242,9 +233,7 @@ async def search_and_process(car_marca: str, car_model: str, transmissao: Option
 
         # Dividir a lista de URLs em sublistas de blocos de 10
         href_blocks = split_list(hrefs, 10)
-
-        # Retorna o modelo CarList com as sublistas de URLs
-        return CarList(car_list=href_blocks)
+        return href_blocks
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
@@ -252,9 +241,7 @@ async def search_and_process(car_marca: str, car_model: str, transmissao: Option
 @app.post("/capture_car_data")
 async def capture_car_data(info: ContactInfo = Body(...)) -> List[Dict]:
     try:
-        driver = create_driver()
         car_details_list = process_car_links(info.hrefs, info.name_value, info.phone_value, info.email_value, info.message_value)
-        driver.quit()
         return car_details_list
 
     except Exception as e:
