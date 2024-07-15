@@ -28,8 +28,8 @@ def create_driver() -> webdriver.Chrome:
 def split_list(lst, n):
     return [lst[i:i + n] for i in range(0, len(lst), n)]
 
-def search_hrefs(car_model: str = Query(..., description="Modelo do carro"),
-                 car_marca: str = Query(..., description="Marca do carro"),
+def search_hrefs(car_marca: str = Query(..., description="Marca do carro"),
+                 car_model: str = Query(..., description="Modelo do carro"),
                  transmissao: Optional[str] = Query(None, description="Tipo de transmissão"),
                  preco_a_partir: Optional[str] = Query(None, description="Preço a partir de"),
                  preco_ate: Optional[str] = Query(None, description="Preço até"),
@@ -202,14 +202,14 @@ def process_car_links(hrefs: List[str], name_value: str, phone_value: Optional[s
     return car_details_list
 
 @app.get("/search_hrefs")
-async def search_and_process(car_model: str = Query(..., description="Modelo do carro"),
-                             car_marca: str = Query(..., description="Marca do carro"),
+async def search_and_process(car_marca: str = Query(..., description="Marca do carro"),
+                             car_model: str = Query(..., description="Modelo do carro"),
                              transmissao: Optional[str] = Query(None, description="Tipo de transmissão"),
                              preco_a_partir: Optional[str] = Query(None, description="Preço a partir de"),
                              preco_ate: Optional[str] = Query(None, description="Preço até"),
                              km: Optional[str] = Query(None, description="Quilometragem máxima")) -> List[List[str]]:
     try:
-        hrefs = search_hrefs(car_model, car_marca, transmissao, preco_a_partir, preco_ate, km)
+        hrefs = search_hrefs(car_marca, car_model, transmissao, preco_a_partir, preco_ate, km)
         if not hrefs:
             raise HTTPException(status_code=404, detail="No car listings found")
 
