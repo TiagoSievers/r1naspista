@@ -12,6 +12,10 @@ from selenium.webdriver.support.ui import Select
 import time
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
 import concurrent.futures
+import time
+from selenium.common.exceptions import WebDriverException
+
+MAX_RETRIES = 3
 
 app = FastAPI()
 
@@ -116,6 +120,19 @@ def search_hrefs(car_marca: str, car_model: str, transmissao: Optional[str] = No
         driver.quit()
 
     return hrefs
+
+def capture_car_info_with_retry(driver: webdriver.Chrome, href: str, name_value: str, phone_value: Optional[str], email_value: Optional[str], message_value: str) -> dict:
+    retries = 0
+    while retries < MAX_RETRIES:
+        try:
+            return capture_car_info(driver, href, name_value, phone_value, email_value, message_value)
+        except WebDriverException as e:
+            print(f"Erro ao capturar informações do carro na tentativa {retries + 1}: {str(e)}")
+            retries += 1
+            time.sleep(5)  # Espera 5 segundos antes de tentar novamente
+
+    print(f"Não foi possível capturar informações do carro após {MAX_RETRIES} tentativas.")
+    return {"error_message": "Falha ao capturar informações do carro"}
 
 def capture_car_info(driver: webdriver.Chrome, href: str, name_value: str, phone_value: Optional[str], email_value: Optional[str], message_value: str) -> dict:
     try:
@@ -233,8 +250,11 @@ async def search_and_process(params: CarSearchParams = Body(...)) -> List[List[s
 @app.post("/capture_car_data")
 async def capture_car_data(info: ContactInfo = Body(...)) -> List[Dict]:
     try:
+        driver = create_driver()
         car_details_list = process_car_links(info.hrefs, info.name_value, info.phone_value, info.email_value, info.message_value)
+        driver.quit()
         return car_details_list
 
     except Exception as e:
+        print(f"An error occurred during car data capture: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
