@@ -1,5 +1,6 @@
 from typing import Optional, List, Dict
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, HTTPException, Body
+from pydantic import BaseModel
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.chrome.options import Options
@@ -13,6 +14,21 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException,
 import concurrent.futures
 
 app = FastAPI()
+
+class CarSearchParams(BaseModel):
+    car_marca: str
+    car_model: str
+    transmissao: Optional[str] = None
+    preco_a_partir: Optional[str] = None
+    preco_ate: Optional[str] = None
+    km: Optional[str] = None
+
+class ContactInfo(BaseModel):
+    hrefs: List[str]
+    name_value: str
+    phone_value: Optional[str] = None
+    email_value: Optional[str] = None
+    message_value: str
 
 def create_driver() -> webdriver.Chrome:
     chrome_options = webdriver.ChromeOptions()
@@ -28,12 +44,8 @@ def create_driver() -> webdriver.Chrome:
 def split_list(lst, n):
     return [lst[i:i + n] for i in range(0, len(lst), n)]
 
-def search_hrefs(car_marca: str = Query(..., description="Marca do carro"),
-                 car_model: str = Query(..., description="Modelo do carro"),
-                 transmissao: Optional[str] = Query(None, description="Tipo de transmissão"),
-                 preco_a_partir: Optional[str] = Query(None, description="Preço a partir de"),
-                 preco_ate: Optional[str] = Query(None, description="Preço até"),
-                 km: Optional[str] = Query(None, description="Quilometragem máxima")) -> List[str]:
+def search_hrefs(car_marca: str, car_model: str, transmissao: Optional[str] = None, preco_a_partir: Optional[str] = None,
+                 preco_ate: Optional[str] = None, km: Optional[str] = None) -> List[str]:
     driver = create_driver()
     hrefs = []
 
@@ -201,15 +213,10 @@ def process_car_links(hrefs: List[str], name_value: str, phone_value: Optional[s
 
     return car_details_list
 
-@app.get("/search_hrefs")
-async def search_and_process(car_marca: str = Query(..., description="Marca do carro"),
-                             car_model: str = Query(..., description="Modelo do carro"),
-                             transmissao: Optional[str] = Query(None, description="Tipo de transmissão"),
-                             preco_a_partir: Optional[str] = Query(None, description="Preço a partir de"),
-                             preco_ate: Optional[str] = Query(None, description="Preço até"),
-                             km: Optional[str] = Query(None, description="Quilometragem máxima")) -> List[List[str]]:
+@app.post("/search_hrefs")
+async def search_and_process(params: CarSearchParams = Body(...)) -> List[List[str]]:
     try:
-        hrefs = search_hrefs(car_marca, car_model, transmissao, preco_a_partir, preco_ate, km)
+        hrefs = search_hrefs(params.car_marca, params.car_model, params.transmissao, params.preco_a_partir, params.preco_ate, params.km)
         if not hrefs:
             raise HTTPException(status_code=404, detail="No car listings found")
 
@@ -221,13 +228,9 @@ async def search_and_process(car_marca: str = Query(..., description="Marca do c
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 @app.post("/capture_car_data")
-async def capture_car_data(hrefs: List[str] = Query(..., description="Lista de URLs dos carros"),
-                           name_value: str = Query(None, description="Nome do contato"),
-                           phone_value: Optional[str] = Query(None, description="Telefone do contato"),
-                           email_value: Optional[str] = Query(None, description="Email do contato"),
-                           message_value: str = Query(None, description="Mensagem para o vendedor")) -> List[Dict]:
+async def capture_car_data(info: ContactInfo = Body(...)) -> List[Dict]:
     try:
-        car_details_list = process_car_links(hrefs, name_value, phone_value, email_value, message_value)
+        car_details_list = process_car_links(info.hrefs, info.name_value, info.phone_value, info.email_value, info.message_value)
         return car_details_list
 
     except Exception as e:
