@@ -123,12 +123,12 @@ def capture_car_info(driver: webdriver.Chrome, href: str, name_value: str, phone
 
         car_info = {"href": href}
 
-        def get_element_text(xpath: str, timeout=3) -> str:
+        def get_element_text(xpath: str, timeout=10) -> str:
             try:
                 element = WebDriverWait(driver, timeout).until(
                     EC.presence_of_element_located((By.XPATH, xpath))
                 )
-                return element.text.strip()
+                return element.text.strip() if element else ""
             except TimeoutException:
                 return ""
 
@@ -139,6 +139,9 @@ def capture_car_info(driver: webdriver.Chrome, href: str, name_value: str, phone
         car_info["cambio"] = get_element_text('//li[div[div[text()="Câmbio"]]]/div[@variant="subheading" and @color="text-primary"]')
         car_info["ano"] = get_element_text('//li[div[div[text()="Ano"]]]/div[@variant="subheading" and @color="text-primary"]')
         car_info["loja"] = get_element_text('//h3[@class="sc-b35e10ef-0 jplEHn"]')
+
+        if not car_info["price"]:
+            car_info["price"] = "Preço não disponível"
 
         driver.get(f"{href}/lead/contato")
 
@@ -198,7 +201,7 @@ def capture_car_info(driver: webdriver.Chrome, href: str, name_value: str, phone
 
     except Exception as e:
         print(f"Erro ao capturar informações do carro: {str(e)}")
-        return {}
+        return {"error_message": str(e)}
 
 def process_car_links(hrefs: List[str], name_value: str, phone_value: Optional[str], email_value: Optional[str], message_value: str) -> List[dict]:
     car_details_list = []
