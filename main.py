@@ -19,14 +19,6 @@ MAX_RETRIES = 3
 
 app = FastAPI()
 
-class CarSearchParams(BaseModel):
-    car_marca: str
-    car_model: str
-    transmissao: Optional[str] = None
-    preco_a_partir: Optional[str] = None
-    preco_ate: Optional[str] = None
-    km: Optional[str] = None
-
 class ContactInfo(BaseModel):
     hrefs: List[str]
     name_value: str
@@ -38,7 +30,7 @@ def create_driver() -> webdriver.Chrome:
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--headless=new")
-    chrome_options.add_argument('window-size=1920x1080')
+    #chrome_options.add_argument('window-size=1920x1080')
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--log-level=3")
     chrome_options.add_argument("--disable-logging")
@@ -233,10 +225,11 @@ def process_car_links(hrefs: List[str], name_value: str, phone_value: Optional[s
 
     return car_details_list
 
-@app.post("/search_hrefs")
-async def search_and_process(params: CarSearchParams = Body(...)) -> List[List[str]]:
+@app.get("/search_hrefs")
+async def search_and_process(car_marca: str, car_model: str, transmissao: Optional[str] = None, preco_a_partir: Optional[str] = None,
+                             preco_ate: Optional[str] = None, km: Optional[str] = None) -> List[List[str]]:
     try:
-        hrefs = search_hrefs(params.car_marca, params.car_model, params.transmissao, params.preco_a_partir, params.preco_ate, params.km)
+        hrefs = search_hrefs(car_marca, car_model, transmissao, preco_a_partir, preco_ate, km)
         if not hrefs:
             raise HTTPException(status_code=404, detail="No car listings found")
 
